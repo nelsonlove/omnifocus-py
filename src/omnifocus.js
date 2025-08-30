@@ -1,12 +1,25 @@
 import { execSync } from 'child_process';
+import { writeFileSync, unlinkSync } from 'fs';
 
 export class OmniFocusClient {
   runJXA(script) {
     try {
-      const result = execSync(`osascript -l JavaScript -e '${script}'`, {
+      // Write script to temp file and execute it
+      const tempFile = `/tmp/jxa-script-${Date.now()}.js`;
+      writeFileSync(tempFile, script);
+      
+      const result = execSync(`osascript -l JavaScript ${tempFile}`, {
         encoding: 'utf8',
         maxBuffer: 10 * 1024 * 1024
       });
+      
+      // Clean up temp file
+      try {
+        unlinkSync(tempFile);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
       return result.trim();
     } catch (error) {
       throw new Error(`JXA execution failed: ${error.message}`);
@@ -313,7 +326,7 @@ export class OmniFocusClient {
   }
 
   createTask(options) {
-    const { name, note, project, parentTaskId, context, flagged, dueDate, deferDate, force = false } = options;
+    const { name, note, project, parentTaskId, context, flagged, dueDate, deferDate, repetitionRule, force = false } = options;
     
     if (!name) {
       throw new Error('Task name is required');
@@ -375,15 +388,58 @@ export class OmniFocusClient {
         }
       ` : ''}
       
+      
       JSON.stringify({
         id: task.id(),
         name: task.name(),
-        created: true
+        created: true,
+        recurring: ${repetitionRule ? 'true' : 'false'}
       });
     `;
     
     const result = this.runJXA(script);
-    return JSON.parse(result);
+    const taskData = JSON.parse(result);
+    
+    // If we have a repetition rule, set it using AppleScript
+    // (JXA can't set repetition properties due to type conversion issues)
+    if (repetitionRule && taskData.id) {
+      // Convert unit to singular form for AppleScript
+      const unitMap = {
+        'days': 'day',
+        'day': 'day',
+        'weeks': 'week',
+        'week': 'week',
+        'months': 'month',
+        'month': 'month',
+        'years': 'year',
+        'year': 'year'
+      };
+      
+      const unit = unitMap[repetitionRule.unit] || 'day';
+      const fixed = repetitionRule.method === 'fixed' ? 'true' : 'false';
+      
+      const appleScript = `
+        tell application "OmniFocus"
+          tell default document
+            set targetTask to first item of (flattened tasks whose id is "${taskData.id}")
+            set repetition of targetTask to {unit:${unit}, steps:${repetitionRule.interval}, fixed:${fixed}}
+            return "ok"
+          end tell
+        end tell
+      `;
+      
+      try {
+        execSync(`osascript -e '${appleScript.replace(/'/g, "'\"'\"'")}'`, {
+          encoding: 'utf8'
+        });
+        taskData.recurring = true;
+      } catch (e) {
+        // Repetition setting failed, but task was created
+        console.error('Warning: Could not set repetition rule:', e.message);
+      }
+    }
+    
+    return taskData;
   }
 
   completeTask(taskId) {

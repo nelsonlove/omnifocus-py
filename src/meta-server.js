@@ -699,7 +699,7 @@ async function main() {
   server.registerTool(
     'of_create_task',
     {
-      description: 'Create a new task in OmniFocus (requires context unless force=true)',
+      description: 'Create a new task in OmniFocus, including recurring tasks (requires context unless force=true)',
       inputSchema: {
         name: z.string().describe('Task name (required)'),
         note: z.string().optional().describe('Task note/description'),
@@ -709,6 +709,11 @@ async function main() {
         flagged: z.boolean().optional().describe('Whether task is flagged'),
         dueDate: z.string().optional().describe('Due date in ISO format'),
         deferDate: z.string().optional().describe('Defer date in ISO format'),
+        repetitionRule: z.object({
+          method: z.enum(['fixed', 'start_after_completion', 'due_after_completion']).describe('Repetition method'),
+          interval: z.number().describe('Repeat interval (e.g., 1 for every day, 2 for every 2 weeks)'),
+          unit: z.enum(['days', 'weeks', 'months', 'years']).describe('Repetition unit')
+        }).optional().describe('Repetition rule for recurring tasks'),
         force: z.boolean().optional().default(false).describe('Allow creating task without context')
       }
     },
