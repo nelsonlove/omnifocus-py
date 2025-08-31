@@ -787,7 +787,9 @@ async function main() {
         note: z.string().optional().describe('New task note'),
         flagged: z.boolean().optional().describe('New flagged status'),
         dueDate: z.string().nullable().optional().describe('New due date in ISO format (or null to clear)'),
-        deferDate: z.string().nullable().optional().describe('New defer date in ISO format (or null to clear)')
+        deferDate: z.string().nullable().optional().describe('New defer date in ISO format (or null to clear)'),
+        project: z.string().nullable().optional().describe('Move to project (name) or null for inbox'),
+        context: z.string().nullable().optional().describe('Change context/tag (name) or null to clear')
       }
     },
     async (args = {}) => {
@@ -862,6 +864,42 @@ async function main() {
     async (args = {}) => {
       try {
         const result = metaPIM.omnifocus.deleteProject(args.projectId);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Error: ${error.message}`
+            }
+          ],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Move task to project
+  server.registerTool(
+    'of_move_task_to_project',
+    {
+      description: 'Move a task to a different project or to the inbox',
+      inputSchema: {
+        taskId: z.string().describe('The ID of the task to move'),
+        projectName: z.string().nullable().optional().describe('Project name to move to (or null/"inbox" for inbox)')
+      }
+    },
+    async (args = {}) => {
+      try {
+        const projectName = args.projectName === null || args.projectName === 'inbox' ? null : args.projectName;
+        const result = metaPIM.omnifocus.moveTaskToProject(args.taskId, projectName);
         return {
           content: [
             {

@@ -467,7 +467,7 @@ export class OmniFocusClient {
   }
 
   updateTask(taskId, updates) {
-    const { name, note, flagged, dueDate, deferDate } = updates;
+    const { name, note, flagged, dueDate, deferDate, project, context } = updates;
     
     const script = `
       const app = Application("OmniFocus");
@@ -482,11 +482,85 @@ export class OmniFocusClient {
         ${dueDate !== undefined ? `task.dueDate = ${dueDate ? `new Date("${dueDate}")` : 'null'};` : ''}
         ${deferDate !== undefined ? `task.deferDate = ${deferDate ? `new Date("${deferDate}")` : 'null'};` : ''}
         
+        ${project !== undefined ? `
+          // Move to project (or inbox if project is null)
+          if ("${project}" === "null" || "${project}" === "") {
+            // Move to inbox
+            task.assignedContainer = null;
+          } else {
+            const projects = doc.flattenedProjects.whose({name: "${project}"})();
+            if (projects.length > 0) {
+              task.assignedContainer = projects[0];
+            } else {
+              throw new Error("Project not found: ${project}");
+            }
+          }
+        ` : ''}
+        
+        ${context !== undefined ? `
+          // Change context/tag
+          if ("${context}" === "null" || "${context}" === "") {
+            task.primaryTag = null;
+          } else {
+            const tags = doc.flattenedTags.whose({name: "${context}"})();
+            if (tags.length > 0) {
+              task.primaryTag = tags[0];
+            }
+          }
+        ` : ''}
+        
         JSON.stringify({
           id: task.id(),
           name: task.name(),
           updated: true
         });
+      } else {
+        JSON.stringify({error: "Task not found"});
+      }
+    `;
+    
+    const result = this.runJXA(script);
+    return JSON.parse(result);
+  }
+
+  moveTaskToProject(taskId, projectName) {
+    const script = `
+      const app = Application("OmniFocus");
+      const doc = app.defaultDocument;
+      const tasks = doc.flattenedTasks.whose({id: "${taskId}"})();
+      
+      if (tasks.length > 0) {
+        const task = tasks[0];
+        const oldProject = task.assignedContainer() ? task.assignedContainer().name() : "Inbox";
+        
+        if ("${projectName}" === "inbox" || "${projectName}" === "" || !${projectName ? 'true' : 'false'}) {
+          // Move to inbox
+          task.assignedContainer = null;
+          JSON.stringify({
+            id: task.id(),
+            name: task.name(),
+            moved: true,
+            from: oldProject,
+            to: "Inbox"
+          });
+        } else {
+          // Move to specific project
+          const projects = doc.flattenedProjects.whose({name: "${projectName}"})();
+          if (projects.length > 0) {
+            task.assignedContainer = projects[0];
+            JSON.stringify({
+              id: task.id(),
+              name: task.name(),
+              moved: true,
+              from: oldProject,
+              to: "${projectName}"
+            });
+          } else {
+            JSON.stringify({
+              error: "Project not found: ${projectName}"
+            });
+          }
+        }
       } else {
         JSON.stringify({error: "Task not found"});
       }
