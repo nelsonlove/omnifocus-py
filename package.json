@@ -5,8 +5,7 @@
   "main": "src/index.js",
   "type": "module",
   "bin": {
-    "omnifocus-mcp": "./src/index.js",
-    "pim-mcp": "./src/meta-server.js"
+    "omnifocus-mcp": "./src/index.js"
   },
   "scripts": {
     "start": "node src/index.js"

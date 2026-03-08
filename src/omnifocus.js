@@ -942,6 +942,131 @@ export class OmniFocusClient {
     return JSON.parse(result);
   }
 
+  // Batch operations - DRY approach reusing existing methods
+  
+  batchComplete(taskIds) {
+    const results = {
+      succeeded: [],
+      failed: []
+    };
+    
+    for (const taskId of taskIds) {
+      try {
+        const result = this.completeTask(taskId);
+        results.succeeded.push({
+          id: taskId,
+          name: result.name
+        });
+      } catch (error) {
+        results.failed.push({
+          id: taskId,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  batchUpdate(taskIds, updates) {
+    const results = {
+      succeeded: [],
+      failed: []
+    };
+    
+    for (const taskId of taskIds) {
+      try {
+        const result = this.updateTask(taskId, updates);
+        results.succeeded.push({
+          id: taskId,
+          name: result.name
+        });
+      } catch (error) {
+        results.failed.push({
+          id: taskId,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  batchMoveToProject(taskIds, projectName) {
+    const results = {
+      succeeded: [],
+      failed: []
+    };
+    
+    for (const taskId of taskIds) {
+      try {
+        const result = this.moveTaskToProject(taskId, projectName);
+        results.succeeded.push({
+          id: taskId,
+          name: result.name,
+          from: result.from,
+          to: result.to
+        });
+      } catch (error) {
+        results.failed.push({
+          id: taskId,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  batchDelete(taskIds) {
+    const results = {
+      succeeded: [],
+      failed: []
+    };
+    
+    for (const taskId of taskIds) {
+      try {
+        const result = this.deleteTask(taskId);
+        results.succeeded.push({
+          id: taskId,
+          name: result.name
+        });
+      } catch (error) {
+        results.failed.push({
+          id: taskId,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  // Generic batch operation processor for custom operations
+  batchProcess(taskIds, operation, ...args) {
+    const results = {
+      succeeded: [],
+      failed: []
+    };
+    
+    for (const taskId of taskIds) {
+      try {
+        const result = this[operation](taskId, ...args);
+        results.succeeded.push({
+          id: taskId,
+          result: result
+        });
+      } catch (error) {
+        results.failed.push({
+          id: taskId,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
+  }
+  
   getTasksByDateFilter(filterType = 'all', options = {}) {
     // filterType can be: 'all', 'due_today', 'due_soon', 'overdue', 'deferred', 'available'
     // options can include: daysAhead (for due_soon), includeCompleted

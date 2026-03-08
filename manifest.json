@@ -1,164 +1,48 @@
 {
   "dxt_version": "0.1",
-  "name": "omnifocus-pim",
+  "name": "omnifocus-mcp",
   "version": "1.0.0",
-  "description": "Personal Information Management integration for OmniFocus and Obsidian via MCP",
+  "description": "OmniFocus integration via MCP",
   "author": {
     "name": "Nelson"
   },
   "server": {
     "type": "node",
-    "entry_point": "src/meta-server.js",
+    "entry_point": "src/index.js",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/src/meta-server.js"],
+      "args": ["${__dirname}/src/index.js"],
       "env": {}
     }
   },
-  "display_name": "OmniFocus & Obsidian PIM",
-  "long_description": "Integrate OmniFocus task management and Obsidian note-taking through the Model Context Protocol. Provides comprehensive CRUD operations for tasks, projects, folders, contexts/tags, and notes with advanced filtering and cross-tool linking capabilities.",
-  "keywords": ["omnifocus", "obsidian", "gtd", "tasks", "notes", "productivity", "mcp"],
+  "display_name": "OmniFocus MCP",
+  "long_description": "Integrate OmniFocus task management through the Model Context Protocol. Provides CRUD operations for tasks, projects, folders, and contexts/tags.",
+  "keywords": ["omnifocus", "gtd", "tasks", "productivity", "mcp"],
   "license": "MIT",
   "compatibility": {
     "platforms": ["darwin"]
   },
-  "user_config": {
-    "obsidianVaultPath": {
-      "type": "string",
-      "title": "Obsidian Vault Path",
-      "description": "Path to your Obsidian vault (optional)",
-      "default": "",
-      "required": false
-    }
-  },
   "tools": [
-    {
-      "name": "search_everywhere",
-      "description": "Search across all PIM tools"
-    },
-    {
-      "name": "create_linked",
-      "description": "Create linked items across PIM tools"
-    },
-    {
-      "name": "of_get_tasks",
-      "description": "Get tasks with advanced filtering"
-    },
-    {
-      "name": "of_get_task",
-      "description": "Get a task with all subtasks"
-    },
-    {
-      "name": "of_create_task",
-      "description": "Create a new task"
-    },
-    {
-      "name": "of_update_task",
-      "description": "Update an existing task"
-    },
-    {
-      "name": "of_complete_task",
-      "description": "Mark a task as completed"
-    },
-    {
-      "name": "of_delete_task",
-      "description": "Delete a task"
-    },
-    {
-      "name": "of_get_tasks_by_date",
-      "description": "Filter tasks by date criteria"
-    },
-    {
-      "name": "of_get_projects",
-      "description": "Get all projects"
-    },
-    {
-      "name": "of_get_project",
-      "description": "Get a project with all tasks"
-    },
-    {
-      "name": "of_create_project",
-      "description": "Create a new project"
-    },
-    {
-      "name": "of_update_project",
-      "description": "Update a project"
-    },
-    {
-      "name": "of_complete_project",
-      "description": "Mark a project as completed"
-    },
-    {
-      "name": "of_delete_project",
-      "description": "Delete a project"
-    },
-    {
-      "name": "of_get_contexts",
-      "description": "Get all contexts/tags"
-    },
-    {
-      "name": "of_create_context",
-      "description": "Create a new context/tag"
-    },
-    {
-      "name": "of_update_context",
-      "description": "Update a context/tag"
-    },
-    {
-      "name": "of_delete_context",
-      "description": "Delete a context/tag"
-    },
-    {
-      "name": "of_get_folders",
-      "description": "Get all folders"
-    },
-    {
-      "name": "of_create_folder",
-      "description": "Create a new folder"
-    },
-    {
-      "name": "of_update_folder",
-      "description": "Update a folder"
-    },
-    {
-      "name": "of_delete_folder",
-      "description": "Delete a folder"
-    },
-    {
-      "name": "obs_search_notes",
-      "description": "Search notes in Obsidian"
-    },
-    {
-      "name": "obs_read_note",
-      "description": "Read a note from Obsidian vault"
-    },
-    {
-      "name": "obs_update_note",
-      "description": "Update or create a note in Obsidian"
-    },
-    {
-      "name": "obs_global_search",
-      "description": "Search across entire Obsidian vault"
-    },
-    {
-      "name": "obs_list_notes",
-      "description": "List notes in Obsidian vault"
-    },
-    {
-      "name": "obs_manage_tags",
-      "description": "Manage tags for an Obsidian note"
-    },
-    {
-      "name": "obs_search_replace",
-      "description": "Search and replace text in a note"
-    },
-    {
-      "name": "obs_manage_frontmatter",
-      "description": "Manage YAML frontmatter for a note"
-    },
-    {
-      "name": "obs_delete_note",
-      "description": "Delete a note from Obsidian vault"
-    }
+    { "name": "get_tasks", "description": "Get tasks with optional filters" },
+    { "name": "get_task", "description": "Get a task with all subtasks" },
+    { "name": "create_task", "description": "Create a new task" },
+    { "name": "update_task", "description": "Update an existing task" },
+    { "name": "complete_task", "description": "Mark a task as completed" },
+    { "name": "delete_task", "description": "Delete a task" },
+    { "name": "get_tasks_by_date", "description": "Filter tasks by date criteria" },
+    { "name": "get_projects", "description": "Get all projects" },
+    { "name": "get_project", "description": "Get a project with all tasks" },
+    { "name": "create_project", "description": "Create a new project" },
+    { "name": "update_project", "description": "Update a project" },
+    { "name": "complete_project", "description": "Mark a project as completed" },
+    { "name": "delete_project", "description": "Delete a project" },
+    { "name": "get_contexts", "description": "Get all contexts/tags" },
+    { "name": "create_context", "description": "Create a new context/tag" },
+    { "name": "update_context", "description": "Update a context/tag" },
+    { "name": "delete_context", "description": "Delete a context/tag" },
+    { "name": "get_folders", "description": "Get all folders" },
+    { "name": "create_folder", "description": "Create a new folder" },
+    { "name": "update_folder", "description": "Update a folder" },
+    { "name": "delete_folder", "description": "Delete a folder" }
   ]
 }

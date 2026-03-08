@@ -1,5 +1,0 @@
-{
-  "obsidianApiKey": "your-obsidian-api-key-here",
-  "obsidianApiUrl": "http://127.0.0.1:27123",
-  "obsidianVaultPath": "/path/to/your/obsidian/vault"
-}
