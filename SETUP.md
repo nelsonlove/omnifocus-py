@@ -79,3 +79,25 @@ OmniFocus requires automation permissions. Grant in:
 - `create_folder` — create a folder
 - `update_folder` — update a folder
 - `delete_folder` — delete a folder
+
+## Troubleshooting
+
+### Server doesn't appear in Claude Desktop
+1. Check that the path in `claude_desktop_config.json` is absolute and correct
+2. Ensure Node.js is installed: `node --version`
+3. Check Claude Desktop logs for errors
+
+### Permission errors on macOS
+OmniFocus requires accessibility permissions for automation. Grant in:
+System Settings → Privacy & Security → Automation
+
+### OmniFocus not responding
+Ensure OmniFocus is running when using the MCP server. JXA requires the application to be active.
+
+### Task IDs
+Task IDs are OmniFocus's internal identifiers. Use `get_tasks` to list tasks and retrieve their IDs before updating or completing them.
+
+### Testing the server standalone
+```bash
+node src/index.js
+```
