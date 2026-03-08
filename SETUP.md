@@ -92,7 +92,7 @@ OmniFocus requires accessibility permissions for automation. Grant in:
 System Settings → Privacy & Security → Automation
 
 ### OmniFocus not responding
-Ensure OmniFocus is running when using the MCP server. JXA requires the application to be active.
+The server will launch OmniFocus automatically if it isn't running. If you get errors, try opening OmniFocus manually first to confirm it has the necessary automation permissions.
 
 ### Task IDs
 Task IDs are OmniFocus's internal identifiers. Use `get_tasks` to list tasks and retrieve their IDs before updating or completing them.
