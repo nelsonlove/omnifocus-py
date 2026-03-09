@@ -261,3 +261,301 @@ for (var i = 0; i < folders.length; i++) {
 JSON.stringify(results);
 """
         return _run_jxa_json(script)
+
+    # ------------------------------------------------------------------
+    # Write operations
+    # ------------------------------------------------------------------
+
+    def create_task(
+        self,
+        name: str,
+        note: str | None = None,
+        project: str | None = None,
+        parent_task_id: str | None = None,
+        context: str | None = None,
+        flagged: bool | None = None,
+        due_date: str | None = None,
+        defer_date: str | None = None,
+    ) -> dict:
+        """Create an inbox task.
+
+        Optionally assign to *project* (by name), nest under *parent_task_id*,
+        set a tag (*context*), flag it, or set dates.  Returns
+        ``{id, name, created: True}``.
+        """
+        esc_name = _escape(name)
+
+        note_js = f', note: "{_escape(note)}"' if note else ""
+        flagged_js = f", flagged: {str(flagged).lower()}" if flagged is not None else ""
+        due_js = f', dueDate: new Date("{due_date}")' if due_date else ""
+        defer_js = f', deferDate: new Date("{defer_date}")' if defer_date else ""
+
+        # Where to put the task: parent task or inbox (+ optional project)
+        if parent_task_id:
+            esc_pid = _escape(parent_task_id)
+            placement_js = f"""\
+var parentTasks = doc.flattenedTasks.whose({{id: "{esc_pid}"}})();
+if (parentTasks.length > 0) {{
+    parentTasks[0].tasks.push(task);
+}} else {{
+    throw new Error("Parent task not found");
+}}"""
+        else:
+            project_assign = ""
+            if project:
+                esc_proj = _escape(project)
+                project_assign = f"""\
+var projects = doc.flattenedProjects.whose({{name: "{esc_proj}"}})();
+if (projects.length > 0) {{
+    task.assignedContainer = projects[0];
+}}"""
+            placement_js = f"""\
+doc.inboxTasks.push(task);
+{project_assign}"""
+
+        context_js = ""
+        if context:
+            esc_ctx = _escape(context)
+            context_js = f"""\
+var tags = doc.flattenedTags.whose({{name: "{esc_ctx}"}})();
+if (tags.length > 0) {{
+    task.primaryTag = tags[0];
+}}"""
+
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var task = app.InboxTask({{
+    name: "{esc_name}"{note_js}{flagged_js}{due_js}{defer_js}
+}});
+{placement_js}
+{context_js}
+JSON.stringify({{
+    id: task.id(),
+    name: task.name(),
+    created: true
+}});
+"""
+        return _run_jxa_json(script)
+
+    def create_project(
+        self,
+        name: str,
+        note: str | None = None,
+        folder: str | None = None,
+        status: str = "active",
+        due_date: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict:
+        """Create a project, optionally in a folder and with tags.
+
+        Returns ``{id, name, created: True}``.
+        """
+        esc_name = _escape(name)
+
+        note_js = f', note: "{_escape(note)}"' if note else ""
+        status_js = ', status: "on hold status"' if status == "on hold" else ""
+        due_js = f', dueDate: new Date("{due_date}")' if due_date else ""
+
+        if folder:
+            esc_folder = _escape(folder)
+            folder_js = f"""\
+var folders = doc.flattenedFolders.whose({{name: "{esc_folder}"}})();
+if (folders.length > 0) {{
+    folders[0].projects.push(project);
+}} else {{
+    doc.projects.push(project);
+}}"""
+        else:
+            folder_js = "doc.projects.push(project);"
+
+        tag_js = ""
+        if tags:
+            for t in tags:
+                esc_t = _escape(t)
+                tag_js += f"""\
+var tagObj = null;
+var allTags = doc.flattenedTags();
+for (var ti = 0; ti < allTags.length; ti++) {{
+    if (allTags[ti].name() === "{esc_t}") {{
+        tagObj = allTags[ti];
+        break;
+    }}
+}}
+if (tagObj) {{
+    app.add(tagObj, {{to: project.tags}});
+}}
+"""
+
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var project = app.Project({{
+    name: "{esc_name}"{note_js}{status_js}{due_js}
+}});
+{folder_js}
+{tag_js}
+JSON.stringify({{
+    id: project.id(),
+    name: project.name(),
+    created: true
+}});
+"""
+        return _run_jxa_json(script)
+
+    def update_task(
+        self,
+        task_id: str,
+        name: str | None = None,
+        note: str | None = None,
+        flagged: bool | None = None,
+        due_date: str | None = None,
+        defer_date: str | None = None,
+        project: str | None = None,
+        context: str | None = None,
+    ) -> dict:
+        """Update fields on an existing task.
+
+        Only provided (non-None) fields are changed.
+        Returns ``{id, name, updated: True}``.
+        """
+        esc_id = _escape(task_id)
+
+        updates: list[str] = []
+        if name is not None:
+            updates.append(f'task.name = "{_escape(name)}";')
+        if note is not None:
+            updates.append(f'task.note = "{_escape(note)}";')
+        if flagged is not None:
+            updates.append(f"task.flagged = {str(flagged).lower()};")
+        if due_date is not None:
+            updates.append(f'task.dueDate = new Date("{due_date}");')
+        if defer_date is not None:
+            updates.append(f'task.deferDate = new Date("{defer_date}");')
+
+        if project is not None:
+            esc_proj = _escape(project)
+            updates.append(f"""\
+var projects = doc.flattenedProjects.whose({{name: "{esc_proj}"}})();
+if (projects.length > 0) {{
+    task.assignedContainer = projects[0];
+}}""")
+
+        if context is not None:
+            esc_ctx = _escape(context)
+            updates.append(f"""\
+var ctxTags = doc.flattenedTags.whose({{name: "{esc_ctx}"}})();
+if (ctxTags.length > 0) {{
+    task.primaryTag = ctxTags[0];
+}}""")
+
+        updates_js = "\n".join(updates)
+
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tasks = doc.flattenedTasks.whose({{id: "{esc_id}"}})();
+if (tasks.length === 0) {{
+    throw new Error("Task not found");
+}}
+var task = tasks[0];
+{updates_js}
+JSON.stringify({{
+    id: task.id(),
+    name: task.name(),
+    updated: true
+}});
+"""
+        return _run_jxa_json(script)
+
+    def update_project(
+        self,
+        project_id: str,
+        name: str | None = None,
+        note: str | None = None,
+        status: str | None = None,
+        due_date: str | None = None,
+    ) -> dict:
+        """Update fields on an existing project.
+
+        Returns ``{id, name, updated: True}``.
+        """
+        esc_id = _escape(project_id)
+
+        updates: list[str] = []
+        if name is not None:
+            updates.append(f'project.name = "{_escape(name)}";')
+        if note is not None:
+            updates.append(f'project.note = "{_escape(note)}";')
+        if status is not None:
+            of_status = "on hold" if status == "on hold" else "active"
+            updates.append(f'project.status = "{of_status}";')
+        if due_date is not None:
+            updates.append(f'project.dueDate = new Date("{due_date}");')
+
+        updates_js = "\n".join(updates)
+
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var projects = doc.flattenedProjects.whose({{id: "{esc_id}"}})();
+if (projects.length === 0) {{
+    throw new Error("Project not found");
+}}
+var project = projects[0];
+{updates_js}
+JSON.stringify({{
+    id: project.id(),
+    name: project.name(),
+    updated: true
+}});
+"""
+        return _run_jxa_json(script)
+
+    def complete_task(self, task_id: str) -> dict:
+        """Mark a task complete.
+
+        Returns ``{id, name, completed: True}``.
+        """
+        esc_id = _escape(task_id)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tasks = doc.flattenedTasks.whose({{id: "{esc_id}"}})();
+if (tasks.length === 0) {{
+    throw new Error("Task not found");
+}}
+var task = tasks[0];
+var taskName = task.name();
+task.markComplete();
+JSON.stringify({{
+    id: "{esc_id}",
+    name: taskName,
+    completed: true
+}});
+"""
+        return _run_jxa_json(script)
+
+    def delete_task(self, task_id: str) -> dict:
+        """Delete a task.
+
+        Returns ``{id, name, deleted: True}``.
+        """
+        esc_id = _escape(task_id)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tasks = doc.flattenedTasks.whose({{id: "{esc_id}"}})();
+if (tasks.length === 0) {{
+    throw new Error("Task not found");
+}}
+var task = tasks[0];
+var taskName = task.name();
+app.delete(task);
+JSON.stringify({{
+    id: "{esc_id}",
+    name: taskName,
+    deleted: true
+}});
+"""
+        return _run_jxa_json(script)
