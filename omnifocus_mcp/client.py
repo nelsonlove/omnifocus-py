@@ -559,3 +559,190 @@ JSON.stringify({{
 }});
 """
         return _run_jxa_json(script)
+
+    # ------------------------------------------------------------------
+    # Tag operations
+    # ------------------------------------------------------------------
+
+    def create_tag(self, tag_name: str) -> None:
+        """Create an OmniFocus tag.  Idempotent -- no-op if it already exists."""
+        esc = _escape(tag_name)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tags = doc.flattenedTags();
+var exists = false;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc}") {{
+        exists = true;
+        break;
+    }}
+}}
+if (!exists) {{
+    var tag = app.Tag({{name: "{esc}"}});
+    doc.tags.push(tag);
+}}
+'ok';
+"""
+        _run_jxa(script)
+
+    def tag_project(self, project_name: str, tag_name: str) -> None:
+        """Add a tag to a project by name.  Creates the tag if needed.  Idempotent."""
+        esc_proj = _escape(project_name)
+        esc_tag = _escape(tag_name)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+
+// Find project
+var proj = null;
+var projects = doc.flattenedProjects();
+for (var i = 0; i < projects.length; i++) {{
+    if (projects[i].name() === "{esc_proj}") {{
+        proj = projects[i];
+        break;
+    }}
+}}
+if (!proj) throw new Error("Project not found: {esc_proj}");
+
+// Find or create tag
+var tag = null;
+var tags = doc.flattenedTags();
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") {{
+        tag = tags[i];
+        break;
+    }}
+}}
+if (!tag) {{
+    tag = app.Tag({{name: "{esc_tag}"}});
+    doc.tags.push(tag);
+}}
+
+// Add tag if not already present
+var projTags = proj.tags();
+var hasTag = false;
+for (var i = 0; i < projTags.length; i++) {{
+    if (projTags[i].name() === "{esc_tag}") {{
+        hasTag = true;
+        break;
+    }}
+}}
+if (!hasTag) {{
+    app.add(tag, {{to: proj.tags}});
+}}
+'ok';
+"""
+        _run_jxa(script)
+
+    def untag_project(self, project_name: str, tag_name: str) -> None:
+        """Remove a tag from a project.  No-op if tag not present."""
+        esc_proj = _escape(project_name)
+        esc_tag = _escape(tag_name)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+
+var proj = null;
+var projects = doc.flattenedProjects();
+for (var i = 0; i < projects.length; i++) {{
+    if (projects[i].name() === "{esc_proj}") {{
+        proj = projects[i];
+        break;
+    }}
+}}
+if (!proj) throw new Error("Project not found: {esc_proj}");
+
+var projTags = proj.tags();
+for (var i = 0; i < projTags.length; i++) {{
+    if (projTags[i].name() === "{esc_tag}") {{
+        app.remove(projTags[i], {{from: proj.tags}});
+        break;
+    }}
+}}
+'ok';
+"""
+        _run_jxa(script)
+
+    def tag_task(self, task_id: str, tag_name: str) -> None:
+        """Add a tag to a task by ID.  Creates the tag if needed.  Idempotent."""
+        esc_id = _escape(task_id)
+        esc_tag = _escape(tag_name)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+
+var tasks = doc.flattenedTasks.whose({{id: "{esc_id}"}})();
+if (tasks.length === 0) throw new Error("Task not found");
+var task = tasks[0];
+
+// Find or create tag
+var tag = null;
+var tags = doc.flattenedTags();
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") {{
+        tag = tags[i];
+        break;
+    }}
+}}
+if (!tag) {{
+    tag = app.Tag({{name: "{esc_tag}"}});
+    doc.tags.push(tag);
+}}
+
+// Add tag if not already present
+var taskTags = task.tags();
+var hasTag = false;
+for (var i = 0; i < taskTags.length; i++) {{
+    if (taskTags[i].name() === "{esc_tag}") {{
+        hasTag = true;
+        break;
+    }}
+}}
+if (!hasTag) {{
+    app.add(tag, {{to: task.tags}});
+}}
+'ok';
+"""
+        _run_jxa(script)
+
+    def untag_task(self, task_id: str, tag_name: str) -> None:
+        """Remove a tag from a task.  No-op if tag not present."""
+        esc_id = _escape(task_id)
+        esc_tag = _escape(tag_name)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+
+var tasks = doc.flattenedTasks.whose({{id: "{esc_id}"}})();
+if (tasks.length === 0) throw new Error("Task not found");
+var task = tasks[0];
+
+var taskTags = task.tags();
+for (var i = 0; i < taskTags.length; i++) {{
+    if (taskTags[i].name() === "{esc_tag}") {{
+        app.remove(taskTags[i], {{from: task.tags}});
+        break;
+    }}
+}}
+'ok';
+"""
+        _run_jxa(script)
+
+    def open_project(self, name: str) -> None:
+        """Open a project in OmniFocus front window by name."""
+        esc = _escape(name)
+        script = f"""\
+var app = Application("OmniFocus");
+app.activate();
+var doc = app.defaultDocument;
+var projects = doc.flattenedProjects();
+for (var i = 0; i < projects.length; i++) {{
+    if (projects[i].name() === "{esc}") {{
+        var win = doc.documentWindows[0];
+        win.selectedViewModeProjectsSidebar = projects[i];
+        break;
+    }}
+}}
+"""
+        _run_jxa(script)
