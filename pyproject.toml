@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omnifocus-mcp"
+version = "2.0.0"
+description = "MCP server and Python library for OmniFocus"
+requires-python = ">=3.10"
+dependencies = ["mcp>=1.0"]
+license = "MIT"
+authors = [{ name = "Nelson Love" }]
+
+[project.scripts]
+omnifocus-mcp = "omnifocus_mcp.server:main"
