@@ -732,17 +732,22 @@ for (var i = 0; i < taskTags.length; i++) {{
     def open_project(self, name: str) -> None:
         """Open a project in OmniFocus front window by name."""
         esc = _escape(name)
+        # Get the project ID via JXA
         script = f"""\
 var app = Application("OmniFocus");
-app.activate();
 var doc = app.defaultDocument;
 var projects = doc.flattenedProjects();
+var foundId = "";
 for (var i = 0; i < projects.length; i++) {{
     if (projects[i].name() === "{esc}") {{
-        var win = doc.documentWindows[0];
-        win.selectedViewModeProjectsSidebar = projects[i];
+        foundId = projects[i].id();
         break;
     }}
 }}
+foundId;
 """
-        _run_jxa(script)
+        project_id = _run_jxa(script).strip()
+        if not project_id:
+            raise OmniFocusError(f"Project not found: {name}")
+        # Open via URL scheme — more reliable than JXA window manipulation
+        subprocess.run(["open", f"omnifocus:///task/{project_id}"], check=True)
