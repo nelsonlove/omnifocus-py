@@ -435,11 +435,15 @@ JSON.stringify({{
 
         if project is not None:
             esc_proj = _escape(project)
+            # assignedContainer only works for inbox tasks; use Omni
+            # Automation's moveTasks() via evaluateJavascript() to move
+            # tasks that are already inside a project.
             updates.append(f"""\
-var projects = doc.flattenedProjects.whose({{name: "{esc_proj}"}})();
-if (projects.length > 0) {{
-    task.assignedContainer = projects[0];
-}}""")
+app.evaluateJavascript('\
+var t = Task.byIdentifier("' + task.id() + '");\
+var ps = flattenedProjects.filter(function(p){{ return p.name === "{esc_proj}"; }});\
+if (t && ps.length > 0) {{ moveTasks([t], ps[0]); }}\
+');""")
 
         if context is not None:
             esc_ctx = _escape(context)
