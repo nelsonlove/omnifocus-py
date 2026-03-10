@@ -568,6 +568,27 @@ JSON.stringify({{
     # Tag operations
     # ------------------------------------------------------------------
 
+    def rename_tag(self, old_name: str, new_name: str) -> None:
+        """Rename an OmniFocus tag.  Preserves hierarchy and task associations."""
+        esc_old = _escape(old_name)
+        esc_new = _escape(new_name)
+        script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tags = doc.flattenedTags();
+var tag = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_old}") {{
+        tag = tags[i];
+        break;
+    }}
+}}
+if (!tag) throw new Error("Tag not found: {esc_old}");
+tag.name = "{esc_new}";
+'ok';
+"""
+        _run_jxa(script)
+
     def create_tag(self, tag_name: str) -> None:
         """Create an OmniFocus tag.  Idempotent -- no-op if it already exists."""
         esc = _escape(tag_name)

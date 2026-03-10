@@ -183,6 +183,16 @@ def delete_task(task_id: str) -> dict:
 
 
 @mcp.tool()
+def rename_tag(old_name: str, new_name: str) -> dict:
+    """Rename an OmniFocus tag. Preserves hierarchy and all task associations."""
+    try:
+        client.rename_tag(old_name=old_name, new_name=new_name)
+        return {"old_name": old_name, "new_name": new_name, "renamed": True}
+    except OmniFocusError as exc:
+        return {"error": str(exc)}
+
+
+@mcp.tool()
 def create_tag(tag_name: str) -> dict:
     """Create an OmniFocus tag. Idempotent -- no-op if it already exists."""
     try:
