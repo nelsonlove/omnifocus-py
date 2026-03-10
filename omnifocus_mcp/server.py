@@ -193,6 +193,16 @@ def rename_tag(old_name: str, new_name: str) -> dict:
 
 
 @mcp.tool()
+def move_tag(tag_name: str, parent_name: str | None = None) -> dict:
+    """Move an OmniFocus tag under another tag, or to the top level if parent is null."""
+    try:
+        client.move_tag(tag_name=tag_name, parent_name=parent_name)
+        return {"tag": tag_name, "parent": parent_name, "moved": True}
+    except OmniFocusError as exc:
+        return {"error": str(exc)}
+
+
+@mcp.tool()
 def create_tag(tag_name: str) -> dict:
     """Create an OmniFocus tag. Idempotent -- no-op if it already exists."""
     try:

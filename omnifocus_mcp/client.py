@@ -589,6 +589,122 @@ tag.name = "{esc_new}";
 """
         _run_jxa(script)
 
+    def move_tag(self, tag_name: str, parent_name: str | None) -> None:
+        """Move a tag to be a child of another tag, or to the top level.
+
+        OmniFocus JXA doesn't support reparenting tags directly, so this
+        collects all tagged tasks/projects, deletes the old tag, recreates
+        it under the new parent, and reassigns all associations.
+        """
+        esc_tag = _escape(tag_name)
+        if parent_name is None:
+            script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tags = doc.flattenedTags();
+var tag = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") {{ tag = tags[i]; break; }}
+}}
+if (!tag) throw new Error("Tag not found: {esc_tag}");
+
+// Collect tagged task/project IDs
+var taskIds = [];
+var tasks = doc.flattenedTasks();
+for (var i = 0; i < tasks.length; i++) {{
+    var tt = tasks[i].tags();
+    for (var j = 0; j < tt.length; j++) {{
+        if (tt[j].id() === tag.id()) {{ taskIds.push(tasks[i].id()); break; }}
+    }}
+}}
+// Collect children names (to recreate)
+var childNames = [];
+var children = tag.tags();
+for (var i = 0; i < children.length; i++) {{ childNames.push(children[i].name()); }}
+
+// Delete old tag
+tag.delete();
+
+// Recreate at top level
+var newTag = app.Tag({{name: "{esc_tag}"}});
+doc.tags.push(newTag);
+
+// Recreate children
+for (var i = 0; i < childNames.length; i++) {{
+    newTag.tags.push(app.Tag({{name: childNames[i]}}));
+}}
+
+// Reassign tasks
+tags = doc.flattenedTags();
+var fresh = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}" && tags[i].parentTag() === null) {{ fresh = tags[i]; break; }}
+}}
+if (fresh) {{
+    for (var i = 0; i < taskIds.length; i++) {{
+        var t = doc.flattenedTasks.whose({{id: taskIds[i]}})()[0];
+        if (t) t.tags.push(fresh);
+    }}
+}}
+JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, children: childNames.length}});
+"""
+        else:
+            esc_parent = _escape(parent_name)
+            script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tags = doc.flattenedTags();
+var tag = null;
+var parent = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") tag = tags[i];
+    if (tags[i].name() === "{esc_parent}") parent = tags[i];
+}}
+if (!tag) throw new Error("Tag not found: {esc_tag}");
+if (!parent) throw new Error("Parent tag not found: {esc_parent}");
+
+// Collect tagged task/project IDs
+var taskIds = [];
+var tasks = doc.flattenedTasks();
+for (var i = 0; i < tasks.length; i++) {{
+    var tt = tasks[i].tags();
+    for (var j = 0; j < tt.length; j++) {{
+        if (tt[j].id() === tag.id()) {{ taskIds.push(tasks[i].id()); break; }}
+    }}
+}}
+// Collect children names
+var childNames = [];
+var children = tag.tags();
+for (var i = 0; i < children.length; i++) {{ childNames.push(children[i].name()); }}
+
+// Delete old tag
+tag.delete();
+
+// Recreate under parent
+var newTag = app.Tag({{name: "{esc_tag}"}});
+parent.tags.push(newTag);
+
+// Recreate children
+for (var i = 0; i < childNames.length; i++) {{
+    newTag.tags.push(app.Tag({{name: childNames[i]}}));
+}}
+
+// Reassign tasks
+tags = doc.flattenedTags();
+var fresh = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") {{ fresh = tags[i]; break; }}
+}}
+if (fresh) {{
+    for (var i = 0; i < taskIds.length; i++) {{
+        var t = doc.flattenedTasks.whose({{id: taskIds[i]}})()[0];
+        if (t) t.tags.push(fresh);
+    }}
+}}
+JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, children: childNames.length}});
+"""
+        _run_jxa(script)
+
     def create_tag(self, tag_name: str) -> None:
         """Create an OmniFocus tag.  Idempotent -- no-op if it already exists."""
         esc = _escape(tag_name)
