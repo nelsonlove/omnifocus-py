@@ -19,8 +19,9 @@ Dependency direction: `plugin → CLI → OmniFocusClient → JXA/osascript`
 ## Development
 
 ```bash
-pip install -e ".[mcp,dev]"   # full install with MCP server + dev tools
-pip install -e .               # core library + CLI only
+uv run pytest                      # run tests
+uv run omnifocus --help            # run CLI
+uv sync --extra mcp --extra dev    # full install into .venv
 ```
 
 ## CLI conventions
