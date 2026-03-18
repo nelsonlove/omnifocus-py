@@ -7,9 +7,11 @@ via ``osascript -l JavaScript``, and parses the JSON result.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
-import os
+
+from .models import Folder, Project, Tag, Task
 
 
 class OmniFocusError(Exception):
@@ -79,13 +81,19 @@ class OmniFocusClient:
         project: str | None = None,
         context: str | None = None,
         flagged: bool | None = None,
-        completed: bool = False,
-    ) -> list[dict]:
-        """Return tasks, optionally filtered by project, context/tag, flagged, or completion status."""
+        completed: bool | None = False,
+    ) -> list[Task]:
+        """Return tasks, optionally filtered by project, context/tag, flagged, or completion status.
+
+        Args:
+            completed: False = only incomplete (default), True = only completed,
+                       None = do not filter by completion (return both).
+        """
 
         # Build .whose() conditions for the initial fetch
         whose_parts: list[str] = []
-        whose_parts.append(f"completed: {str(completed).lower()}")
+        if completed is not None:
+            whose_parts.append(f"completed: {str(completed).lower()}")
         if flagged is not None:
             whose_parts.append(f"flagged: {str(flagged).lower()}")
 
@@ -143,9 +151,23 @@ for (var i = 0; i < tasks.length; i++) {{
 }}
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Task(
+                id=r["id"],
+                name=r["name"],
+                note=r.get("note", ""),
+                flagged=bool(r.get("flagged", False)),
+                completed=bool(r.get("completed", False)),
+                defer_date=r.get("deferDate"),
+                due_date=r.get("dueDate"),
+                project=r.get("project"),
+                tags=r.get("tags", []),
+            )
+            for r in rows
+        ]
 
-    def get_projects(self) -> list[dict]:
+    def get_projects(self) -> list[Project]:
         """Return all projects with folder, status, dates, and tags."""
 
         script = """\
@@ -179,9 +201,22 @@ for (var i = 0; i < projects.length; i++) {
 }
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Project(
+                id=r["id"],
+                name=r["name"],
+                note=r.get("note", ""),
+                status=r.get("status", "active"),
+                folder=r.get("folder"),
+                due_date=r.get("dueDate"),
+                completion_date=r.get("completionDate"),
+                tags=r.get("tags", []),
+            )
+            for r in rows
+        ]
 
-    def get_contexts(self) -> list[dict]:
+    def get_contexts(self) -> list[Tag]:
         """Return all tags (contexts) with parent/child relationships."""
 
         script = """\
@@ -220,9 +255,18 @@ for (var i = 0; i < tags.length; i++) {
 }
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Tag(
+                id=r["id"],
+                name=r["name"],
+                parent_tag=r.get("parentTag"),
+                child_tags=r.get("childTags", []),
+            )
+            for r in rows
+        ]
 
-    def get_folders(self) -> list[dict]:
+    def get_folders(self) -> list[Folder]:
         """Return all folders with parent, projects, and subfolders."""
 
         script = """\
@@ -260,7 +304,17 @@ for (var i = 0; i < folders.length; i++) {
 }
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Folder(
+                id=r["id"],
+                name=r["name"],
+                parent_folder=r.get("parentFolder"),
+                projects=r.get("projects", []),
+                subfolders=r.get("subfolders", []),
+            )
+            for r in rows
+        ]
 
     # ------------------------------------------------------------------
     # Write operations
@@ -586,6 +640,148 @@ for (var i = 0; i < tags.length; i++) {{
 if (!tag) throw new Error("Tag not found: {esc_old}");
 tag.name = "{esc_new}";
 'ok';
+"""
+        _run_jxa(script)
+
+    def move_tag(self, tag_name: str, parent_name: str | None) -> None:
+        """Move a tag to be a child of another tag, or to the top level.
+
+        OmniFocus JXA doesn't support reparenting tags directly, so this
+        collects all tagged tasks/projects, deletes the old tag, recreates
+        it under the new parent, and reassigns all associations.
+        """
+        esc_tag = _escape(tag_name)
+        if parent_name is None:
+            script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tags = doc.flattenedTags();
+var tag = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") {{ tag = tags[i]; break; }}
+}}
+if (!tag) throw new Error("Tag not found: {esc_tag}");
+
+// Collect tagged task IDs
+var taskIds = [];
+var tasks = doc.flattenedTasks();
+for (var i = 0; i < tasks.length; i++) {{
+    var tt = tasks[i].tags();
+    for (var j = 0; j < tt.length; j++) {{
+        if (tt[j].id() === tag.id()) {{ taskIds.push(tasks[i].id()); break; }}
+    }}
+}}
+// Collect tagged project IDs
+var projectIds = [];
+var projects = doc.flattenedProjects();
+for (var i = 0; i < projects.length; i++) {{
+    var pt = projects[i].tags();
+    for (var j = 0; j < pt.length; j++) {{
+        if (pt[j].id() === tag.id()) {{ projectIds.push(projects[i].id()); break; }}
+    }}
+}}
+// Collect children names (to recreate)
+var childNames = [];
+var children = tag.tags();
+for (var i = 0; i < children.length; i++) {{ childNames.push(children[i].name()); }}
+
+// Delete old tag
+tag.delete();
+
+// Recreate at top level
+var newTag = app.Tag({{name: "{esc_tag}"}});
+doc.tags.push(newTag);
+
+// Recreate children
+for (var i = 0; i < childNames.length; i++) {{
+    newTag.tags.push(app.Tag({{name: childNames[i]}}));
+}}
+
+// Reassign tasks and projects
+tags = doc.flattenedTags();
+var fresh = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}" && tags[i].parentTag() === null) {{ fresh = tags[i]; break; }}
+}}
+if (fresh) {{
+    for (var i = 0; i < taskIds.length; i++) {{
+        var t = doc.flattenedTasks.whose({{id: taskIds[i]}})()[0];
+        if (t) app.add(fresh, {{to: t.tags}});
+    }}
+    for (var i = 0; i < projectIds.length; i++) {{
+        var p = doc.flattenedProjects.whose({{id: projectIds[i]}})()[0];
+        if (p) app.add(fresh, {{to: p.tags}});
+    }}
+}}
+JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, projects_reassigned: projectIds.length, children: childNames.length}});
+"""
+        else:
+            esc_parent = _escape(parent_name)
+            script = f"""\
+var app = Application("OmniFocus");
+var doc = app.defaultDocument;
+var tags = doc.flattenedTags();
+var tag = null;
+var parent = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") tag = tags[i];
+    if (tags[i].name() === "{esc_parent}") parent = tags[i];
+}}
+if (!tag) throw new Error("Tag not found: {esc_tag}");
+if (!parent) throw new Error("Parent tag not found: {esc_parent}");
+
+// Collect tagged task IDs
+var taskIds = [];
+var tasks = doc.flattenedTasks();
+for (var i = 0; i < tasks.length; i++) {{
+    var tt = tasks[i].tags();
+    for (var j = 0; j < tt.length; j++) {{
+        if (tt[j].id() === tag.id()) {{ taskIds.push(tasks[i].id()); break; }}
+    }}
+}}
+// Collect tagged project IDs
+var projectIds = [];
+var projects = doc.flattenedProjects();
+for (var i = 0; i < projects.length; i++) {{
+    var pt = projects[i].tags();
+    for (var j = 0; j < pt.length; j++) {{
+        if (pt[j].id() === tag.id()) {{ projectIds.push(projects[i].id()); break; }}
+    }}
+}}
+// Collect children names
+var childNames = [];
+var children = tag.tags();
+for (var i = 0; i < children.length; i++) {{ childNames.push(children[i].name()); }}
+
+// Delete old tag
+tag.delete();
+
+// Recreate under parent
+var newTag = app.Tag({{name: "{esc_tag}"}});
+parent.tags.push(newTag);
+
+// Recreate children
+for (var i = 0; i < childNames.length; i++) {{
+    newTag.tags.push(app.Tag({{name: childNames[i]}}));
+}}
+
+// Reassign tasks and projects
+tags = doc.flattenedTags();
+var fresh = null;
+for (var i = 0; i < tags.length; i++) {{
+    if (tags[i].name() === "{esc_tag}") {{ fresh = tags[i]; break; }}
+}}
+if (fresh) {{
+    for (var i = 0; i < taskIds.length; i++) {{
+        var t = doc.flattenedTasks.whose({{id: taskIds[i]}})()[0];
+        if (t) app.add(fresh, {{to: t.tags}});
+    }}
+    for (var i = 0; i < projectIds.length; i++) {{
+        var p = doc.flattenedProjects.whose({{id: projectIds[i]}})()[0];
+        if (p) app.add(fresh, {{to: p.tags}});
+    }}
+}}
+JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, projects_reassigned: projectIds.length, children: childNames.length}});
 """
         _run_jxa(script)
 
