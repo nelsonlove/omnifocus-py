@@ -44,16 +44,25 @@ def _emit_error(code: str, message: str):
 @click.option("--project", default=None, help="Filter by project name.")
 @click.option("--tag", "context", default=None, help="Filter by tag name.")
 @click.option("--flagged", is_flag=True, default=None, help="Only flagged tasks.")
-@click.option("--completed", is_flag=True, default=False, help="Include completed tasks.")
+@click.option("--completed", is_flag=True, default=False, help="Include completed tasks (default: incomplete only).")
+@click.option("--only-completed", is_flag=True, default=False, help="Show only completed tasks.")
 @click.pass_context
-def list_tasks(ctx, project, context, flagged, completed):
+def list_tasks(ctx, project, context, flagged, completed, only_completed):
     """List tasks, optionally filtered."""
     client = _client(ctx)
+
+    if only_completed:
+        completed_filter = True
+    elif completed:
+        completed_filter = None  # both
+    else:
+        completed_filter = False  # incomplete only
+
     try:
         tasks = client.get_tasks(
             project=project, context=context,
             flagged=flagged if flagged else None,
-            completed=completed,
+            completed=completed_filter,
         )
     except OmniFocusError as e:
         if ctx.obj["json"]:

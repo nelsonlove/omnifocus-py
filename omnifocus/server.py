@@ -3,7 +3,13 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.fastmcp import FastMCP
+except ModuleNotFoundError:
+    raise SystemExit(
+        "omnifocus MCP server requires the 'mcp' package.\n"
+        "Install with: pip install 'omnifocus-py[mcp]'"
+    )
 
 from .client import OmniFocusClient, OmniFocusError
 
@@ -21,9 +27,9 @@ def get_tasks(
     project: str | None = None,
     context: str | None = None,
     flagged: bool | None = None,
-    completed: bool = False,
+    completed: bool | None = False,
 ) -> list[dict] | dict:
-    """Get tasks from OmniFocus, optionally filtered by project, context/tag, flagged, or completion status."""
+    """Get tasks from OmniFocus, optionally filtered. completed: false=incomplete only, true=completed only, null=both."""
     try:
         tasks = client.get_tasks(
             project=project, context=context, flagged=flagged, completed=completed

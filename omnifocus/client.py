@@ -81,13 +81,19 @@ class OmniFocusClient:
         project: str | None = None,
         context: str | None = None,
         flagged: bool | None = None,
-        completed: bool = False,
+        completed: bool | None = False,
     ) -> list[Task]:
-        """Return tasks, optionally filtered by project, context/tag, flagged, or completion status."""
+        """Return tasks, optionally filtered by project, context/tag, flagged, or completion status.
+
+        Args:
+            completed: False = only incomplete (default), True = only completed,
+                       None = do not filter by completion (return both).
+        """
 
         # Build .whose() conditions for the initial fetch
         whose_parts: list[str] = []
-        whose_parts.append(f"completed: {str(completed).lower()}")
+        if completed is not None:
+            whose_parts.append(f"completed: {str(completed).lower()}")
         if flagged is not None:
             whose_parts.append(f"flagged: {str(flagged).lower()}")
 
@@ -656,13 +662,22 @@ for (var i = 0; i < tags.length; i++) {{
 }}
 if (!tag) throw new Error("Tag not found: {esc_tag}");
 
-// Collect tagged task/project IDs
+// Collect tagged task IDs
 var taskIds = [];
 var tasks = doc.flattenedTasks();
 for (var i = 0; i < tasks.length; i++) {{
     var tt = tasks[i].tags();
     for (var j = 0; j < tt.length; j++) {{
         if (tt[j].id() === tag.id()) {{ taskIds.push(tasks[i].id()); break; }}
+    }}
+}}
+// Collect tagged project IDs
+var projectIds = [];
+var projects = doc.flattenedProjects();
+for (var i = 0; i < projects.length; i++) {{
+    var pt = projects[i].tags();
+    for (var j = 0; j < pt.length; j++) {{
+        if (pt[j].id() === tag.id()) {{ projectIds.push(projects[i].id()); break; }}
     }}
 }}
 // Collect children names (to recreate)
@@ -682,7 +697,7 @@ for (var i = 0; i < childNames.length; i++) {{
     newTag.tags.push(app.Tag({{name: childNames[i]}}));
 }}
 
-// Reassign tasks
+// Reassign tasks and projects
 tags = doc.flattenedTags();
 var fresh = null;
 for (var i = 0; i < tags.length; i++) {{
@@ -691,10 +706,14 @@ for (var i = 0; i < tags.length; i++) {{
 if (fresh) {{
     for (var i = 0; i < taskIds.length; i++) {{
         var t = doc.flattenedTasks.whose({{id: taskIds[i]}})()[0];
-        if (t) t.tags.push(fresh);
+        if (t) app.add(fresh, {{to: t.tags}});
+    }}
+    for (var i = 0; i < projectIds.length; i++) {{
+        var p = doc.flattenedProjects.whose({{id: projectIds[i]}})()[0];
+        if (p) app.add(fresh, {{to: p.tags}});
     }}
 }}
-JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, children: childNames.length}});
+JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, projects_reassigned: projectIds.length, children: childNames.length}});
 """
         else:
             esc_parent = _escape(parent_name)
@@ -711,13 +730,22 @@ for (var i = 0; i < tags.length; i++) {{
 if (!tag) throw new Error("Tag not found: {esc_tag}");
 if (!parent) throw new Error("Parent tag not found: {esc_parent}");
 
-// Collect tagged task/project IDs
+// Collect tagged task IDs
 var taskIds = [];
 var tasks = doc.flattenedTasks();
 for (var i = 0; i < tasks.length; i++) {{
     var tt = tasks[i].tags();
     for (var j = 0; j < tt.length; j++) {{
         if (tt[j].id() === tag.id()) {{ taskIds.push(tasks[i].id()); break; }}
+    }}
+}}
+// Collect tagged project IDs
+var projectIds = [];
+var projects = doc.flattenedProjects();
+for (var i = 0; i < projects.length; i++) {{
+    var pt = projects[i].tags();
+    for (var j = 0; j < pt.length; j++) {{
+        if (pt[j].id() === tag.id()) {{ projectIds.push(projects[i].id()); break; }}
     }}
 }}
 // Collect children names
@@ -737,7 +765,7 @@ for (var i = 0; i < childNames.length; i++) {{
     newTag.tags.push(app.Tag({{name: childNames[i]}}));
 }}
 
-// Reassign tasks
+// Reassign tasks and projects
 tags = doc.flattenedTags();
 var fresh = null;
 for (var i = 0; i < tags.length; i++) {{
@@ -746,10 +774,14 @@ for (var i = 0; i < tags.length; i++) {{
 if (fresh) {{
     for (var i = 0; i < taskIds.length; i++) {{
         var t = doc.flattenedTasks.whose({{id: taskIds[i]}})()[0];
-        if (t) t.tags.push(fresh);
+        if (t) app.add(fresh, {{to: t.tags}});
+    }}
+    for (var i = 0; i < projectIds.length; i++) {{
+        var p = doc.flattenedProjects.whose({{id: projectIds[i]}})()[0];
+        if (p) app.add(fresh, {{to: p.tags}});
     }}
 }}
-JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, children: childNames.length}});
+JSON.stringify({{moved: true, tasks_reassigned: taskIds.length, projects_reassigned: projectIds.length, children: childNames.length}});
 """
         _run_jxa(script)
 
