@@ -1,0 +1,11 @@
+{
+  "name": "omnifocus",
+  "version": "3.0.0",
+  "description": "OmniFocus task management — create, update, complete, and query tasks and projects via MCP",
+  "author": {
+    "name": "Nelson Love"
+  },
+  "repository": "https://github.com/nelsonlove/omnifocus-py",
+  "license": "MIT",
+  "keywords": ["omnifocus", "tasks", "gtd", "mcp"]
+}

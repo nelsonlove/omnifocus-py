@@ -7,9 +7,11 @@ via ``osascript -l JavaScript``, and parses the JSON result.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
-import os
+
+from .models import Folder, Project, Tag, Task
 
 
 class OmniFocusError(Exception):
@@ -80,7 +82,7 @@ class OmniFocusClient:
         context: str | None = None,
         flagged: bool | None = None,
         completed: bool = False,
-    ) -> list[dict]:
+    ) -> list[Task]:
         """Return tasks, optionally filtered by project, context/tag, flagged, or completion status."""
 
         # Build .whose() conditions for the initial fetch
@@ -143,9 +145,23 @@ for (var i = 0; i < tasks.length; i++) {{
 }}
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Task(
+                id=r["id"],
+                name=r["name"],
+                note=r.get("note", ""),
+                flagged=bool(r.get("flagged", False)),
+                completed=bool(r.get("completed", False)),
+                defer_date=r.get("deferDate"),
+                due_date=r.get("dueDate"),
+                project=r.get("project"),
+                tags=r.get("tags", []),
+            )
+            for r in rows
+        ]
 
-    def get_projects(self) -> list[dict]:
+    def get_projects(self) -> list[Project]:
         """Return all projects with folder, status, dates, and tags."""
 
         script = """\
@@ -179,9 +195,22 @@ for (var i = 0; i < projects.length; i++) {
 }
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Project(
+                id=r["id"],
+                name=r["name"],
+                note=r.get("note", ""),
+                status=r.get("status", "active"),
+                folder=r.get("folder"),
+                due_date=r.get("dueDate"),
+                completion_date=r.get("completionDate"),
+                tags=r.get("tags", []),
+            )
+            for r in rows
+        ]
 
-    def get_contexts(self) -> list[dict]:
+    def get_contexts(self) -> list[Tag]:
         """Return all tags (contexts) with parent/child relationships."""
 
         script = """\
@@ -220,9 +249,18 @@ for (var i = 0; i < tags.length; i++) {
 }
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Tag(
+                id=r["id"],
+                name=r["name"],
+                parent_tag=r.get("parentTag"),
+                child_tags=r.get("childTags", []),
+            )
+            for r in rows
+        ]
 
-    def get_folders(self) -> list[dict]:
+    def get_folders(self) -> list[Folder]:
         """Return all folders with parent, projects, and subfolders."""
 
         script = """\
@@ -260,7 +298,17 @@ for (var i = 0; i < folders.length; i++) {
 }
 JSON.stringify(results);
 """
-        return _run_jxa_json(script)
+        rows = _run_jxa_json(script)
+        return [
+            Folder(
+                id=r["id"],
+                name=r["name"],
+                parent_folder=r.get("parentFolder"),
+                projects=r.get("projects", []),
+                subfolders=r.get("subfolders", []),
+            )
+            for r in rows
+        ]
 
     # ------------------------------------------------------------------
     # Write operations

@@ -1,8 +1,11 @@
 """MCP server for OmniFocus."""
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from mcp.server.fastmcp import FastMCP
-from omnifocus_mcp.client import OmniFocusClient, OmniFocusError
+
+from .client import OmniFocusClient, OmniFocusError
 
 mcp = FastMCP("OmniFocus", json_response=True)
 client = OmniFocusClient()
@@ -22,9 +25,10 @@ def get_tasks(
 ) -> list[dict] | dict:
     """Get tasks from OmniFocus, optionally filtered by project, context/tag, flagged, or completion status."""
     try:
-        return client.get_tasks(
+        tasks = client.get_tasks(
             project=project, context=context, flagged=flagged, completed=completed
         )
+        return [asdict(t) for t in tasks]
     except OmniFocusError as exc:
         return {"error": str(exc)}
 
@@ -33,7 +37,7 @@ def get_tasks(
 def get_projects() -> list[dict] | dict:
     """Get all projects from OmniFocus."""
     try:
-        return client.get_projects()
+        return [asdict(p) for p in client.get_projects()]
     except OmniFocusError as exc:
         return {"error": str(exc)}
 
@@ -42,7 +46,7 @@ def get_projects() -> list[dict] | dict:
 def get_contexts() -> list[dict] | dict:
     """Get all tags (contexts) from OmniFocus with parent/child relationships."""
     try:
-        return client.get_contexts()
+        return [asdict(t) for t in client.get_contexts()]
     except OmniFocusError as exc:
         return {"error": str(exc)}
 
@@ -51,7 +55,7 @@ def get_contexts() -> list[dict] | dict:
 def get_folders() -> list[dict] | dict:
     """Get all folders from OmniFocus with parent, projects, and subfolders."""
     try:
-        return client.get_folders()
+        return [asdict(f) for f in client.get_folders()]
     except OmniFocusError as exc:
         return {"error": str(exc)}
 
