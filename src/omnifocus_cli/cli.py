@@ -6,7 +6,7 @@ from dataclasses import asdict
 
 import click
 
-from .client import OmniFocusClient, OmniFocusError
+from omnifocus import OmniFocusClient, OmniFocusError
 
 
 @click.group()
