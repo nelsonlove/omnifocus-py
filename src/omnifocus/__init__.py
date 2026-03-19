@@ -1,4 +1,4 @@
-"""OmniFocus — Python library, CLI, and MCP server for OmniFocus."""
+"""OmniFocus — Python library for OmniFocus on macOS."""
 
 from .client import OmniFocusClient, OmniFocusError
 from .models import Folder, Project, Tag, Task
