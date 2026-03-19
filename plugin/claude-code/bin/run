@@ -1,0 +1,15 @@
+#!/bin/bash
+set -euo pipefail
+PACKAGE="omnifocus-py"
+TOOL="${1:-omnifocus}"
+shift 2>/dev/null || true
+if command -v "$TOOL" &>/dev/null; then exec "$TOOL" "$@"; fi
+if command -v uvx &>/dev/null; then exec uvx --from "$PACKAGE" "$TOOL" "$@"; fi
+PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+VENV_DIR="${PLUGIN_DIR}/.venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Installing ${PACKAGE} (one-time setup)..." >&2
+    python3 -m venv "$VENV_DIR"
+    "$VENV_DIR/bin/pip" install -q "$PACKAGE"
+fi
+exec "$VENV_DIR/bin/$TOOL" "$@"
