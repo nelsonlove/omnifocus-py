@@ -5,16 +5,18 @@ Python library, CLI, and MCP server for OmniFocus on macOS.
 ## Architecture
 
 ```
-omnifocus/
-  client.py      ← OmniFocusClient: unified API via JXA bridge
-  models.py      ← Data classes: Task, Project, Tag, Folder
-  cli.py         ← Click CLI (calls OmniFocusClient)
-  server.py      ← FastMCP server (calls OmniFocusClient)
+src/
+  omnifocus/         ← Pure library (no CLI dependencies)
+    client.py        OmniFocusClient: unified API via JXA bridge
+    models.py        Data classes: Task, Project, Tag, Folder
+    server.py        FastMCP server (calls OmniFocusClient)
+  omnifocus_cli/     ← CLI package (consumes omnifocus library)
+    cli.py           Click CLI (calls OmniFocusClient)
 plugin/
-  claude-code/   ← Claude Code plugin (calls CLI --json)
+  claude-code/       ← Claude Code plugin (calls CLI --json)
 ```
 
-Dependency direction: `plugin → CLI → OmniFocusClient → JXA/osascript`
+Dependency direction: `plugin → CLI (omnifocus_cli) → Library (omnifocus) → JXA/osascript`
 
 ## Development
 
